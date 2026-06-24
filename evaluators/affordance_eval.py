@@ -45,15 +45,129 @@ class AffordanceAccEval:
     def __init__(self, name) -> None:
         self.name = name
 
-    def eval_step(self, model, samples) -> Any:
+    def eval_step(self, model, samples, counter) -> Any:
         samples.update({"category": "ref"})
-        output = model.generate(
-            samples,
-            num_beams=1,
-            max_length=30,
-        )
-        answer = output["text"]
-        pred_mask = output["masks"]
+        # output = model.generate(
+        #     samples,
+        #     num_beams=1,
+        #     max_length=30,
+        # )
+        #answer = output["text"]
+        #pred_mask = output["masks"]
+
+        all_masks = []
+        all_texts = []
+
+        chunk_size = 8
+
+        batch_size = len(samples["question"])
+
+        # for start in range(0, batch_size, chunk_size):
+
+        #     end = start + chunk_size
+
+        #     sub_samples = {}
+
+        #     for k, v in samples.items():
+
+        #         if isinstance(v, list):
+        #             sub_samples[k] = v[start:end]
+
+        #         else:
+        #             sub_samples[k] = v[start:end]
+            #####추가 특정 오브젝트만 추출#########
+        target_id = "f3a7f8198cc50c225f5e789acd4d1122" #컵 - 손잡이 달린
+        found_target = False    
+
+        for start in range(0, batch_size, chunk_size):
+
+                end = start + chunk_size
+
+                sub_samples = {}
+
+                for k, v in samples.items():
+
+                    if isinstance(v, list):
+                        sub_samples[k] = v[start:end]
+
+                    else:
+                        sub_samples[k] = v[start:end]
+
+                chunk_ids = sub_samples["shape_id"]
+                print(chunk_ids)
+
+                if target_id not in chunk_ids:
+                    continue
+
+                found_target=True
+
+                print("Found Target Chunk")
+###################################################
+                output = model.generate(
+                    sub_samples,
+                    num_beams=1,
+                    max_length=30,
+                )
+                if not found_target:
+                    return 0, 0, 0, 0, 0, []
+
+                for i in range(len(output["masks"])):
+
+                    if sub_samples["shape_id"][i] != target_id:
+                        continue
+                    torch.save(
+                        {
+                            "pred": output["masks"][i].cpu(),
+                            "gt": sub_samples["masks"][i].cpu(),
+                            "points": sub_samples["points"][i].cpu(),
+                            "question": sub_samples["question"][i],
+                            "shape_id": sub_samples["shape_id"][i],
+                        },
+                        f"{target_id}.pt"
+                    )
+                    print("Found Target")
+                    exit()
+
+                # all_masks.extend(output["masks"])
+
+                # all_texts.extend(output["text"])
+
+                # del output
+
+                torch.cuda.empty_cache()
+     
+                
+
+        pred_mask = all_masks
+
+        answer = all_texts
+        
+
+    
+        os.makedirs("/data/hbsssssong/mask_outputs", exist_ok=True)
+
+
+        # for i in range(len(pred_mask)):
+
+        #     if sub_samples["shape_id"][i] != target_id:
+        #         continue
+
+        #     torch.save(
+        #         {
+        #             "pred": pred_mask[i].cpu(),
+        #             "gt": sub_samples["masks"][i].cpu(),
+        #             "points": sub_samples["points"][i].cpu(),
+        #             "question": sub_samples["question"][i],
+        #             "shape_id": sub_samples["shape_id"][i],
+        #         },
+                
+        #         #f"mask_outputs/batch_{counter}_sample_{i}.pt"
+        #         f"{target_id}.pt"
+        #     )
+        #     #print(f"mask_outputs/batch_{counter}_sample_{i}.pt")
+        #     print("FOUND TARGET!")
+
+        # exit()
 
         iou, correct_5 = 0.0, 0.0
 
@@ -90,6 +204,7 @@ class AffordanceAccEval:
                 pointPrecision += _pointPrecision
 
                 pointRecall += _pointRecall
+
 
         return (
             correct_5 / num * 100,
@@ -130,7 +245,7 @@ class AffordanceAccEval:
         for samples in metric_logger.log_every(dataloader, print_freq, self.name):
             # print("frequeu",print_freq)
             acc5, iou, pointAcc, pointPrecision, pointRecall, result = self.eval_step(
-                model, samples
+                model, samples, counter
             )
             results.extend(result)
             metric_logger.update(
@@ -141,7 +256,7 @@ class AffordanceAccEval:
                 pointRecall=pointRecall,
             )
             counter += 1
-
+   
         result_dir = os.path.join(dir, self.name)
         os.makedirs(result_dir, exist_ok=True)
         with open(os.path.join(result_dir, f"{get_rank()}.json"), "w") as f:

@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import datetime
+import warnings
 from typing import List
 import torch
 import torch.distributed as dist
@@ -13,6 +14,8 @@ from models.base_model import BaseModel
 from dataset.dataloader_utils import MultiIterLoader, IterLoader
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.dataset import ChainDataset
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 from common.utils import (
     get_rank,
@@ -151,7 +154,7 @@ class Trainer:
         if not os.path.exists(ckpt_path):
             raise RuntimeError(f"Checkpoint file {ckpt_path} does not exist.")
 
-        checkpoint = torch.load(ckpt_path, map_location=self.device)
+        checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
 
         state_dict = checkpoint["model"]
         self.unwrap_dist_model(self.model).load_state_dict(state_dict, strict=False)
@@ -241,7 +244,7 @@ class Trainer:
         self.log_config()
 
         # resume from checkpoint if specified
-        if not self.evaluate_only and self.resume_ckpt_path is not None:
+        if self.resume_ckpt_path is not None:
             self._load_checkpoint(self.resume_ckpt_path)
 
         for cur_epoch in range(self.start_epoch, self.max_epoch):

@@ -225,7 +225,7 @@ def start_conversation(args):
                         pointdata = np.load(file)
                         raw_pointdata = np.copy(pointdata)
                         if raw_pointdata.shape[1] < 6:
-                            zeros = np.zeros(2048, 3))
+                            zeros = np.zeros((2048, 3))
                             raw_pointdata = np.concatenate((raw_pointdata, zeros), axis = 1)
                         LLM_input_points = (
                             torch.Tensor(pc_norm(pointdata[:, :3])).float().cuda()
@@ -312,7 +312,7 @@ def start_conversation(args):
             # run_button.click(user, [text_input, chatbot], [text_input, chatbot], queue=False).then(answer_generate, [chatbot, answer_time, point_clouds, conv_state], chatbot).then(lambda x : x+1, answer_time, answer_time)
 
         demo.queue()
-        demo.launch()  # server_port=7832, share=True
+        demo.launch(share=True)  # server_port=7832, share=True
 
 
 if __name__ == "__main__":

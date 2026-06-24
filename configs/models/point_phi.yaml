@@ -20,7 +20,8 @@ model:
   lora_alpha: 32
 
   # llm
-  llm_model: "/workspace/Model/phi3.5"
+  #llm_model: "/workspace/Model/phi3.5"
+  llm_model: "microsoft/Phi-3.5-mini-instruct"
   # llama2_ckpt
   lora_llm_finetune: True
   freeze_llm: True

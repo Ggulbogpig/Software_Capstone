@@ -26,7 +26,7 @@ SEG_TOKEN = "<SEG>"
 @registry.register_model("aff_phi")
 class AffordancePhi(BaseModel):
     PRETRAINED_MODEL_CONFIG_DICT = {
-        "phi": "/workspace/project/Research_3D_Aff/3D_ADLLM/configs/models/point_phi.yaml",
+        "phi": "/data/hbsssssong/Software_Capstone/configs/models/point_phi.yaml",
     }
 
     def __init__(
@@ -61,7 +61,7 @@ class AffordancePhi(BaseModel):
         max_txt_len=256,
         max_output_txt_len=128,
         freeze_linear=True,
-        label_ratio_path="/workspace/project/Research_3D_Aff/Programme_affllm_code_chs/result_ratio.json",
+        label_ratio_path="/data/hbsssssong/Software_Capstone/result_ratio.json",
         lora_llm_finetune=False,
         **kwargs,
     ):
@@ -123,9 +123,9 @@ class AffordancePhi(BaseModel):
             llm_model,
             use_cache=False,
             trust_remote_code=True,
-            attn_implementation="flash_attention_2",
-            torch_dtype=torch.bfloat16,
-            device_map="cuda",
+            attn_implementation="eager",
+            torch_dtype=torch.float16,
+            #device_map="cuda",
         )
         print("Load LLM Model Successfully")
         if freeze_llm:
@@ -267,8 +267,34 @@ class AffordancePhi(BaseModel):
                 continue
             seq_length = last_hidden_states.shape[1]
             seg_token_mask = seg_token_mask[:seq_length]
-            pred_embeddings_ = projected_hidden_state[i][seg_token_mask]
+            #seg_token_mask = seg_token_mask[-seq_length:]
+
+            #  첫 번째 SEG 토큰만 사용
+            first_seg_idx = seg_token_mask.nonzero(as_tuple=True)[0][0]
+            single_seg_mask = torch.zeros_like(seg_token_mask)
+            single_seg_mask[first_seg_idx] = True
+
+            pred_embeddings_ = projected_hidden_state[i][single_seg_mask]
+#################################
+
+
+            #pred_embeddings_ = projected_hidden_state[i][seg_token_mask]
             point_embedding_ = point_embedding[i].unsqueeze(0)
+            print(
+            "POINT EMB:",
+            point_embedding_.shape
+            )
+
+            print(
+            "PRED EMB:",
+            pred_embeddings_.shape
+            )
+
+            print(
+            "UNSQUEEZE:",
+            pred_embeddings_.unsqueeze(1).shape
+            )
+
             pred_mask = self.aff_model(
                 pointcloud_embeddings=point_embedding_,
                 pointcloud_emorigin=point_embedding_,
@@ -277,6 +303,23 @@ class AffordancePhi(BaseModel):
             )
             pred_masks.append(pred_mask)
         return pred_masks
+    
+    # AffordancePhi 클래스 안에 추가
+    def _patch_llm_for_embeds_only(self):
+            """generate 루프에서 항상 inputs_embeds를 쓰도록 패치"""
+            original_prepare = self.llm_model.prepare_inputs_for_generation
+
+            def patched_prepare(*args, **kwargs):
+                model_inputs = original_prepare(*args, **kwargs)
+                # input_ids 제거, inputs_embeds가 없으면 embed
+                if model_inputs.get('inputs_embeds') is None and model_inputs.get('input_ids') is not None:
+                    input_ids = model_inputs.pop('input_ids')
+                    model_inputs['inputs_embeds'] = self.llm_model.get_input_embeddings()(input_ids)
+                else:
+                    model_inputs.pop('input_ids', None)
+                return model_inputs
+
+            self.llm_model.prepare_inputs_for_generation = patched_prepare
 
     # Prepare Input And Response for LLM
     def prepare_input(self, question):
@@ -500,58 +543,241 @@ class AffordancePhi(BaseModel):
 
                 inputs_embeds = torch.cat([inputs_llm, inputs_embeds], dim=1)
                 attention_mask = torch.cat([atts_llm, attention_mask], dim=1)
+            
+            # dummy_input_ids = torch.zeros(
+            #     (inputs_embeds.shape[0], inputs_embeds.shape[1]),
+            #     dtype=torch.long,
+            #     device=inputs_embeds.device,
+            # )
 
-            outputs = self.llm_model.generate(
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                do_sample=use_nucleus_sampling,
-                top_p=top_p,
-                temperature=temperature,
-                max_new_tokens=max_length,
-                min_new_tokens=min_length,
-                repetition_penalty=repetition_penalty,
-                length_penalty=length_penalty,
-                return_dict_in_generate=True,
-                output_hidden_states=True,
-                output_attentions=True,
-                use_cache=False,
-            )
+            # outputs = self.llm_model.generate(
+            #     input_ids=dummy_input_ids,
+            #     inputs_embeds=inputs_embeds,
+            #     attention_mask=attention_mask,
+            #     do_sample=use_nucleus_sampling,
+            #     top_p=top_p,
+            #     temperature=temperature,
+            #     max_new_tokens=max_length,
+            #     min_new_tokens=min_length,
+            #     repetition_penalty=repetition_penalty,
+            #     length_penalty=length_penalty,
+            #     return_dict_in_generate=True,
+            #     output_hidden_states=True,
+            #     output_attentions=False,
+            #     use_cache=False,
+            #     cache_implementation=None
+            # )
+
+            # 수정: pad_token_id로 채우기
+#             pad_id = self.llm_tokenizer.pad_token_id or self.llm_tokenizer.eos_token_id
+#             dummy_input_ids = torch.full(
+#     (inputs_embeds.shape[0], inputs_embeds.shape[1]),
+#     fill_value=pad_id,
+#     dtype=torch.long,
+#     device=inputs_embeds.device,
+# )
+
+#             outputs = self.llm_model.generate(
+#     input_ids=dummy_input_ids,      
+#     inputs_embeds=inputs_embeds,
+#     attention_mask=attention_mask,
+#     do_sample=use_nucleus_sampling,
+#     top_p=top_p,
+#     temperature=temperature,
+#     max_new_tokens=max_length,
+#     min_new_tokens=min_length,
+#     repetition_penalty=repetition_penalty,
+#     length_penalty=length_penalty,
+#     return_dict_in_generate=True,
+#     output_hidden_states=True,
+#     output_attentions=False,
+#     use_cache=True,               
+# )
+         
+
+#             # 수정 4. dummy_input_ids 원래대로 유지
+#             dummy_input_ids = torch.zeros(
+#             (inputs_embeds.shape[0], inputs_embeds.shape[1]),
+#             dtype=torch.long,
+#             device=inputs_embeds.device,
+#         )
+            
+#             self._patch_llm_for_embeds_only()
+
+#             outputs = self.llm_model.generate(
+#             input_ids=dummy_input_ids,
+#             inputs_embeds=inputs_embeds,
+#             attention_mask=attention_mask,
+#             do_sample=use_nucleus_sampling,
+#             top_p=top_p,
+#             temperature=temperature,
+#             max_new_tokens=max_length,
+#             min_new_tokens=min_length,
+#             repetition_penalty=repetition_penalty,
+#             length_penalty=length_penalty,
+#             return_dict_in_generate=True,
+#             output_hidden_states=True,
+#             output_attentions=False,
+#             use_cache=True,
+#             )
+
+# # 입력 길이 제거해서 생성된 토큰만 추출
+#             input_length = inputs_embeds.shape[1]
+#             output_ids = outputs.sequences[:, input_length:]
+
+#             last_hidden_states = [
+#             token_states[-1] for token_states in outputs.hidden_states[1:]
+#             ]
+#             last_hidden_states = torch.concat(last_hidden_states, dim=1)
+
+
+            # aff_phi.py generate 함수에서 outputs = self.llm_model.generate(...) 대신
+
+            generated_ids = []
+            hidden_states_list = []
+
+# 첫 번째 forward
+            current_embeds = inputs_embeds
+            current_mask = attention_mask
+            past_key_values = None
+
+            for step in range(max_length):
+                with torch.no_grad():
+                    out = self.llm_model(
+                        inputs_embeds=current_embeds,
+                        attention_mask=current_mask,
+                        past_key_values=past_key_values,
+                        use_cache=True,
+                        return_dict=True,
+                        output_hidden_states=True,
+                    )
+    
+                past_key_values = out.past_key_values
+                next_token_logits = out.logits[:, -1, :]
+                next_token = next_token_logits.argmax(dim=-1)  # greedy
+    
+                hidden_states_list.append(out.hidden_states[-1][:, -1:, :])
+                generated_ids.append(next_token)
+    
+    # EOS면 종료
+                if (next_token == self.llm_tokenizer.eos_token_id).all():
+                    break
+    
+    # 다음 스텝: 새 토큰 embedding
+                current_embeds = self.llm_model.get_input_embeddings()(next_token.unsqueeze(1))
+                new_mask = torch.ones((current_mask.shape[0], 1), dtype=torch.long, device=current_mask.device)
+                current_mask = torch.cat([current_mask, new_mask], dim=1)
+
+                output_ids = torch.stack(generated_ids, dim=1)  # [bs, seq_len]
+                last_hidden_states = torch.cat(hidden_states_list, dim=1)  # [bs, seq_len, dim]
+
+
+######추가/변경 outputs를 안 쓰는걸로#######
+                #outputs = None
             pred_masks = []
             if "points" in samples:
-                output_ids = outputs.sequences[:, 1:-1]
-                last_hidden_states = [
-                    token_states[-1] for token_states in outputs.hidden_states[1:-1]
-                ]
-                if len(last_hidden_states) == 0:
+                print(
+                    "RAW OUTPUT:",
+                    self.llm_tokenizer.batch_decode(
+                        output_ids,
+                        skip_special_tokens=False
+                    )
+                )
+                print("SEG TOKEN ID:", self.seg_token_id)
+                print("SEG COUNT:", (output_ids == self.seg_token_id).sum())
+                print("OUTPUT IDS:", output_ids)
+
+                if last_hidden_states.shape[1] == 0:
                     return {"text": "", "masks": []}
-                last_hidden_states = torch.concat(last_hidden_states, dim=1)
                 pred_masks = self.predict_mask(
                     output_ids,
                     last_hidden_states,
                     points,
                     shape_id,
                 )
-        try:
-            output_text = self.llm_tokenizer.batch_decode(
-                outputs["sequences"], skip_special_tokens=True
-            )
-        except Exception as e:
-            print(outputs)
-            raise e
+
+        output_text = self.llm_tokenizer.batch_decode(
+            output_ids, skip_special_tokens=True
+        )
         output_text = [text.strip("<|end|>") for text in output_text]
         masks_score = [score.sigmoid() for score in pred_masks]
-        # pro_pred_masks = [(m > 0).to(torch.float32) for m in pred_masks]
-        # 修改部分：将score大于0.45的设置为GT=1
         pro_pred_masks = [(m > 0.4).to(torch.float32) for m in masks_score]
         output_dict = {
             "text": output_text,
             "masks_scores": masks_score,
             "masks": pro_pred_masks,
             "output_ids": output_ids,
-            "attentions": outputs.attentions,
             "seg_id": self.seg_token_id,
         }
         return output_dict
+    
+
+ #########outputs 쓰는 original version#########   
+        #     #outputs = None
+        #     pred_masks = []
+        #     if "points" in samples:
+        #         #output_ids = outputs.sequences[:, 1:-1]
+        #         #output_ids = outputs.sequences[:, 1:]
+        #         # 수정: 입력 길이만큼 잘라내고 생성된 토큰만
+        #         input_length = inputs_embeds.shape[1]
+        #         output_ids = outputs.sequences[:, input_length:] 
+
+        #         print(
+        #             "RAW OUTPUT:",
+        #             self.llm_tokenizer.batch_decode(
+        #             outputs.sequences,
+        #             skip_special_tokens=False
+        #         )
+        #         )
+
+        #         print(
+        #         "SEG TOKEN ID:",
+        #         self.seg_token_id
+        #         )
+
+        #         print(
+        #         "SEG COUNT:",
+        #         (output_ids == self.seg_token_id).sum()
+        #         )
+
+        #         print(
+        #         "OUTPUT IDS:",
+        #         output_ids
+        #         )
+
+        #         last_hidden_states = [
+        #             token_states[-1] for token_states in outputs.hidden_states[1:]
+        #         ]
+        #         if len(last_hidden_states) == 0:
+        #             return {"text": "", "masks": []}
+        #         last_hidden_states = torch.concat(last_hidden_states, dim=1)
+        #         pred_masks = self.predict_mask(
+        #             output_ids,
+        #             last_hidden_states,
+        #             points,
+        #             shape_id,
+        #         )
+        # try:
+        #     output_text = self.llm_tokenizer.batch_decode(
+        #         outputs["sequences"], skip_special_tokens=True
+        #     )
+        # except Exception as e:
+        #     print(outputs)
+        #     raise e
+        # output_text = [text.strip("<|end|>") for text in output_text]
+        # masks_score = [score.sigmoid() for score in pred_masks]
+        # # pro_pred_masks = [(m > 0).to(torch.float32) for m in pred_masks]
+        # # 修改部分：将score大于0.45的设置为GT=1
+        # pro_pred_masks = [(m > 0.4).to(torch.float32) for m in masks_score]
+        # output_dict = {
+        #     "text": output_text,
+        #     "masks_scores": masks_score,
+        #     "masks": pro_pred_masks,
+        #     "output_ids": output_ids,
+        #     #"attentions": outputs.attentions,
+        #     "seg_id": self.seg_token_id,
+        # }
+        # return output_dict
 
     # Config and Build Model Function
     def load_from_pretrained(self, url_or_filename):
@@ -580,14 +806,14 @@ class AffordancePhi(BaseModel):
         # Point_encoder set
         point_model_config_path = cfg.get(
             "point_model_config_path",
-            "/workspace/project/Research_3D_Aff/3D_ADLLM/configs/models/PointTransformer_2048point.yaml",
+            "configs/models/PointTransformer_2048point.yaml",
         )
         freeze_point = cfg.get("freeze_point", True)
         # seg_encoder
         free_seg_point_encoder = cfg.get("free_seg_point_encoder", False)
         seg_point_encoder_config_path = cfg.get(
             "seg_point_encoder_config_path",
-            "/workspace/project/Research_3D_Aff/3D_ADLLM/models/openad/config/PT_modify.py",
+            "models/openad/config/PT_modify.py",
         )
         seg_point_encoder_path = cfg.get(
             "seg_point_encoder_path",
@@ -610,7 +836,7 @@ class AffordancePhi(BaseModel):
         freeze_linear = cfg.get("freeze_linear", False)
         label_ratio_path = cfg.get(
             "label_ratio_path",
-            "/workspace/project/Research_3D_Aff/3D_ADLLM/result_ratio.json",
+            "result/result_ratio.json",
         )
         lora_llm_finetune = cfg.get("lora_llm_finetune", False)
 
