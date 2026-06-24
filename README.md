@@ -8,7 +8,9 @@
 
 ## 1. 프로젝트 개요
 
-본 프로젝트는 3D 객체의 **어포던스(Affordance)** 정보를 활용하여 사용자 인터랙션에 중요한 영역을 자동으로 탐지하고, 해당 영역에 더 정밀한 Convex Decomposition을 적용하는 파이프라인을 구현한 프로젝트이다.
+본 프로젝트는 3D 객체의 **어포던스(Affordance)** 정보를 활용하여 사용자 인터랙션에 중요한 영역을 자동으로 탐지하고, 해당 영역에 더 정밀한 Empart Convex Decomposition을 적용하는 파이프라인을 구현한 프로젝트이다.
+
+파이프라인은 해당 Affordance 추론 및 granularity 추정 모듈과 Empart ACD 모듈 ( [Software_Capstone_Empart](https://github.com/Ggulbogpig/Software_Capstone_Empart) )이 병렬적으로 동작하여 최종 병합되는 구조이다. 
 
 기존 Approximate Convex Decomposition(ACD)은 주로 객체의 기하학적 특성만을 기준으로 전체 메시를 동일한 기준으로 분해한다. 이 방식은 단순하고 일반적이지만, 실제 게임이나 시뮬레이션 환경에서 사용자가 상호작용하는 영역과 그렇지 않은 영역을 구분하지 못한다.
 
