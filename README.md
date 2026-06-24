@@ -3,6 +3,7 @@
 **Affordance-Guided Automation for 3D Object Convex Decomposition**
 사용자 인터랙션을 고려한 어포던스 기반 3D 객체 볼록 분해 자동화
 
+![Pipeline](title_image.png)
 ---
 
 ## 1. 프로젝트 개요
