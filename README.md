@@ -230,7 +230,7 @@ python pipeline_local.py
 
 ---
 
-### 6.5 최종 결과 확인
+### 6.5 최종 결과 확인 및 시각화
 
 실행이 완료되면 `empart/outputs/` 폴더에 최종 결과 JSON 파일이 생성됩니다.
 
@@ -241,6 +241,8 @@ empart/outputs/total_result_object.json
 ```
 
 해당 JSON 파일에는 affordance 추론 결과를 반영한 interaction-aware convex decomposition 결과가 저장됩니다.
+
+` visualize_CLI.py ` 파일에서 경로 수정 후 실행 시 ACD 진행 결과를 확인할 수 있습니다. 
 
 
 
