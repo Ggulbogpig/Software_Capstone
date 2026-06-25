@@ -148,7 +148,7 @@ Libraries: NumPy, Pandas, Trimesh, Open3D, Scipy, scikit-learn
 
 본 저장소는 3D 메시 파일을 포인트 클라우드로 변환한 뒤, affordance를 추론하고, 추론 결과를 기반으로 EmpartACD를 실행하여 interaction-aware convex decomposition 결과를 생성하는 파이프라인을 제공합니다.
 
-### 1. 3D 메시 파일 준비
+### 6.1 3D 메시 파일 준비
 
 먼저 `.obj` 또는 `.glb` 형식의 원하는 메시 파일을 다운로드하거나 준비합니다.
 
@@ -162,7 +162,7 @@ object/object.glb
 
 ---
 
-### 2. 메시 파일을 포인트 클라우드로 변환
+### 6.2 메시 파일을 포인트 클라우드로 변환
 
 `visualize_ply.py` 파일에서 입력 메시 파일명과 출력 포인트 클라우드 파일명을 수정하거나, 아래 명령어를 실행합니다.
 
@@ -184,7 +184,7 @@ object/object_point.ply
 
 ---
 
-### 3. Affordance 추론 실행
+### 6.3 Affordance 추론 실행
 
 `inference.py` 파일에서 affordance를 추론할 포인트 클라우드 파일 경로를 수정합니다.
 
@@ -216,7 +216,7 @@ storage39441_point_affordance.csv
 
 ---
 
-### 4. EmpartACD 실행 설정
+### 6.4 EmpartACD 실행 설정
 
 `run_empart.sh` 파일에서 실행할 object 파일, affordance CSV 파일, 출력 파일명을 수정합니다.
 
@@ -230,7 +230,7 @@ python pipeline_local.py
 
 ---
 
-### 5. 최종 결과 확인
+### 6.5 최종 결과 확인
 
 실행이 완료되면 `empart/outputs/` 폴더에 최종 결과 JSON 파일이 생성됩니다.
 
